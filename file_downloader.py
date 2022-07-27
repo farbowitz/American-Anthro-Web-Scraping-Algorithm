@@ -19,6 +19,10 @@ import time
 #pandas to read csv
 import pandas as pd
 
+#get rid of the damn double quote
+from unidecode import unidecode
+import string
+
 #set working directory
 wd = 'C:/Users/Daniel/Desktop/Programming/AA Project/'
 os.chdir(wd)
@@ -26,11 +30,16 @@ os.chdir(wd)
 
 ref_csv = 'compiled_catalog_AA.xlsx - Publication Dataset.csv'
 container = 'Journal Articles/'
-user_token = '4bc11424-eb07-4d05-b137-2ead3b257a38'
+user_token = '04256682-ec15-4c49-81f7-624b452e80ea'
 
 #GET URLS from file, which contain DOIs
 df = pd.read_csv(ref_csv)
 df_URLs = df['Access URL']
+df['File Formatted Name'] = 'Vol '+df['Volume'] +' Iss '+df['Issue']+' -- '+df['Author(s)']+' -- '+df['Title']
+#remove all goddamn punctuation
+df['File Formatted Name'] = df['File Formatted Name'].apply(lambda x: unidecode(str(x)).translate(str.maketrans('', '', string.punctuation))+'.pdf')
+df_names = df['File Formatted Name']
+
 
 #putting together DOI
 def doi_from_url(url):
@@ -57,20 +66,39 @@ print(response.text)
 
 
 #function for each request
-def download_pdf(doi, token = user_token):
-    s = requests.Session()
-    res = s.get('https://onlinelibrary.wiley.com')
+def download_pdf(doi, name, token = user_token):
+    
     headers = {
         'Wiley-TDM-Client-Token': token,
         }
-    cookies = dict(res.cookies)
-    response = requests.request('GET','https://onlinelibrary.wiley.com/doi/pdf/'+doi, headers=headers, cookies = cookies, allow_redirects=True)
-    print(response.text)
+    #start a session
+    s = requests.Session()
+
+    #add headers to session
+    s.headers.update(headers)
+    standard_address = 'https://api.wiley.com/onlinelibrary/tdm/v1/articles/'+doi.replace('/', '%2F')
+    print(standard_address)
+    response = s.get(standard_address, headers=headers, allow_redirects=True)
+    print(response.status_code)
     print(response.headers)
-    print(response.content)
-    with open('12168.pdf', 'wb') as f:
+    #print(response.content)
+    with open(wd+"Journal Articles/"+name, 'wb') as f:
         f.write(response.content)
+    time.sleep(3)
 
-
+#ex url: https://onlinelibrary.wiley.com/doi/10.1111/aman.13383
+#https://api.wiley.com/onlinelibrary/tdm/v1/articles/10.1525%2Faa.1889.2.4.02a00060
+'''
+for index in range(len(df)):
+    url = df_URLs.loc[index]
+    #remove any quotes from names so as not to throw an error
+    name = df_names.loc[index].replace('"', '')
+    print(name)
+    doi = doi_from_url(url)
+    print(doi)
+    download_pdf(doi, name)
+#are some of them just freely available and the token doesn't work?
+'''
+#ONCE AGAIN< FUCK OFF WILEY
 
 #MUST CREATE FOLDER FOR EACH PDF SO pyResearchInsights can print to that folder... OR change how it labels its outputs??
